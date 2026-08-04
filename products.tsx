@@ -325,3 +325,100 @@ function AdminProducts() {
     </div>
   );
                 }
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { SearchX } from "lucide-react";
+import { AppShell } from "@/components/shop/AppShell";
+import { ProductCard } from "@/components/shop/ProductCard";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { categoriesQuery, productsQuery } from "@/lib/shop";
+import { cn } from "@/lib/utils";
+
+type ProductSearch = { q?: string | undefined; category?: string | undefined };
+
+export const Route = createFileRoute("/products")({
+  validateSearch: (search: Record<string, unknown>): ProductSearch => ({
+    q: typeof search["q"] === "string" && search["q"] ? (search["q"] as string) : undefined,
+    category:
+      typeof search["category"] === "string" && search["category"]
+        ? (search["category"] as string)
+        : undefined,
+  }),
+  head: () => ({
+    meta: [
+      { title: "Shop all products — Digital Shop" },
+      {
+        name: "description",
+        content:
+          "Browse every product at Digital Shop: smartphones, laptops, audio, smart watches, gaming gear and accessories.",
+      },
+      { property: "og:title", content: "Shop all products — Digital Shop" },
+      {
+        property: "og:description",
+        content: "Search and filter the full Digital Shop catalogue by category.",
+      },
+    ],
+  }),
+  component: ProductsPage,
+});
+
+function ProductsPage() {
+  const { q, category } = Route.useSearch();
+  const navigate = useNavigate({ from: "/products" });
+  const { data: categories } = useQuery(categoriesQuery);
+  const { data: products, isLoading } = useQuery(productsQuery({ search: q, category }));
+
+  return (
+    <AppShell>
+      <h1 className="font-display text-2xl font-bold">
+        {category ?? (q ? `Results for “${q}”` : "All products")}
+      </h1>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {products ? `${products.length} product${products.length === 1 ? "" : "s"}` : "Loading…"}
+      </p>
+
+      <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-1">
+        <Button
+          size="sm"
+          variant={category ? "outline" : "default"}
+          onClick={() => navigate({ search: { q, category: undefined } })}
+        >
+          All
+        </Button>
+        {(categories ?? []).map((item) => (
+          <Button
+            key={item.id}
+            size="sm"
+            variant={category === item.name ? "default" : "outline"}
+            className={cn("shrink-0")}
+            onClick={() => navigate({ search: { q, category: item.name } })}
+          >
+            {item.name}
+          </Button>
+        ))}
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {isLoading
+          ? Array.from({ length: 8 }).map((_, index) => (
+              <Skeleton key={index} className="h-64 rounded-2xl" />
+            ))
+          : (products ?? []).map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+      </div>
+
+      {!isLoading && (products ?? []).length === 0 ? (
+        <div className="mt-10 flex flex-col items-center gap-3 rounded-2xl border border-border bg-card/60 p-10 text-center">
+          <SearchX className="size-8 text-muted-foreground" />
+          <p className="font-semibold">No products found</p>
+          <p className="text-sm text-muted-foreground">Try another search or category.</p>
+          <Button variant="outline" onClick={() => navigate({ search: {} })}>
+            Clear filters
+          </Button>
+        </div>
+      ) : null}
+    </AppShell>
+  );
+}
